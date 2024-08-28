@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, BadRequestException  } from '@nestjs/common';
 import { DatasetService } from './dataset.service';
 import { CreateDatasetDto } from './dto/create-dataset.dto';
 import { UpdateDatasetDto } from './dto/update-dataset.dto';
@@ -83,11 +83,11 @@ export class DatasetController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadCsv(@UploadedFile() file: Express.Multer.File) {
     if (file.mimetype !== 'text/csv') {
-      return 'The file uploaded should be a CSV file';
+      throw new BadRequestException('Only CSV files are allowed!');
     }
 
-    const csvData = await this.datasetService.processCsv(file);
-    return csvData; // Return processed data as JSON
+    const parsedData = await this.datasetService.parseCsv(file.path);
+    return parsedData; // Return the parsed CSV data
   }
 
   @Patch(':id')
