@@ -51,14 +51,13 @@ export class DatasetService {
     }
   }
 
-  async processCsv(file: Express.Multer.File): Promise<any[]> {
-    const csvData = [];
-    const stream = Readable.from(file.buffer.toString());
-
+  async parseCsv(filePath: string): Promise<any[]> {
+    const results = [];
     return new Promise((resolve, reject) => {
-      stream.pipe(csvParser())
-        .on('data', (row) => csvData.push(row))
-        .on('end', () => resolve(csvData))
+      fs.createReadStream(filePath)
+        .pipe(csvParser())
+        .on('data', (data) => results.push(data))
+        .on('end', () => resolve(results))
         .on('error', (error) => reject(error));
     });
   }
