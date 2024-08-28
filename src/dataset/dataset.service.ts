@@ -5,23 +5,19 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Dataset } from './entities/dataset.entity';
 import { Repository } from 'typeorm';
 import * as fs from 'fs';
-import * as cvs from 'csv-parser';
-
-interface CsvRow {
-  [key: string]: string;
-}
+import * as csvParser from 'csv-parser';
+import { Readable } from 'stream';
 
 @Injectable()
 export class DatasetService {
-  constructor(@InjectRepository(Dataset) private datasetRepository: Repository<Dataset>) { }
+  constructor(
+    @InjectRepository(Dataset) private datasetRepository: Repository<Dataset>,
+  ) {}
 
   create(createDatasetDto: CreateDatasetDto) {
     try {
-      // Save the dataset to the database
       return this.datasetRepository.save(createDatasetDto);
-    }
-    catch (error) {
-      // Return the error
+    } catch (error) {
       return error;
     }
   }
@@ -34,21 +30,38 @@ export class DatasetService {
     return this.datasetRepository.findOneBy({ id });
   }
 
-  getData(id: number) {
-    this.findOne(id).then((dataset) => {
-      const result: CsvRow[] = [];
-      fs.createReadStream(`./${dataset.data}`)
-        .pipe(cvs())
-        .on('data', (data) => result.push(data))
-        .on('end', () => {
-          console.log(result);
-          return result;
-        })
+  async getData(id: number): Promise<any[]> {
+    try {
+      const dataset = await this.findOne(id);
+      if (!dataset) {
+        return ['Dataset not found'];
+      }
+
+      const result = [];
+
+      return new Promise((resolve, reject) => {
+        fs.createReadStream(`./${dataset.data}`)
+          .pipe(csvParser())
+          .on('data', (data) => result.push(data))
+          .on('end', () => resolve(result))
+          .on('error', (error) => reject(error));
+      });
+    } catch (error) {
+      return [`Error retrieving data: ${error.message}`];
     }
-    ).catch((error) => {
-      return error;
+  }
+
+  async processCsv(file: Express.Multer.File): Promise<any[]> {
+    const csvData = [];
+    const stream = Readable.from(file.buffer.toString());
+
+    return new Promise((resolve, reject) => {
+      stream.pipe(csvParser())
+        .on('data', (row) => csvData.push(row))
+        .on('end', () => resolve(csvData))
+        .on('error', (error) => reject(error));
     });
-  };
+  }
 
   update(id: number, updateDatasetDto: UpdateDatasetDto) {
     return this.datasetRepository.update(id, updateDatasetDto);
